@@ -23,6 +23,7 @@ from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_cap
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
+from openpilot.sunnypilot.selfdrive.car.rivian_lat_angle import update_rivian_max_steering_angle
 
 REPLAY = "REPLAY" in os.environ
 
@@ -306,6 +307,10 @@ class Car:
       # sunnypilot
       self.dynamic_experimental_control = self.params.get_bool("DynamicExperimentalControl")
       self.v_cruise_helper.read_custom_set_speed_params()
+
+      # ndm: apply the user's Rivian steering-angle limit live (no restart)
+      if self.CP.brand == "rivian":
+        update_rivian_max_steering_angle(self.params)
 
       time.sleep(0.1)
 
