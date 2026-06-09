@@ -191,6 +191,9 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"MadsSteeringMode", {PERSISTENT | BACKUP, INT, "0"}},
     {"MadsUnifiedEngagementMode", {PERSISTENT | BACKUP, BOOL, "1"}},
 
+    // ndm: Rivian-only — max steering-wheel angle (deg) before MADS releases lateral control. Stock cutoff is 90.
+    {"RivianMaxSteeringAngle", {PERSISTENT | BACKUP, INT, "90"}},
+
     // Model Manager params
     {"ModelManager_ActiveBundle", {PERSISTENT, JSON}},
     {"ModelManager_ClearCache", {CLEAR_ON_MANAGER_START, BOOL}},
