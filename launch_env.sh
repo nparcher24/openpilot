@@ -19,4 +19,8 @@ if [ -z "$AGNOS_VERSION" ]; then
   export AGNOS_VERSION="18.4"
 fi
 
+# ndm: driver-monitoring resource test — disable the driver-facing camera sensor
+# in camerad (road/wide cameras unaffected). Revert this commit to restore.
+export DISABLE_DRIVER="1"
+
 export STAGING_ROOT="/data/safe_staging"

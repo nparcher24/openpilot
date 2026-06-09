@@ -1,48 +1,44 @@
 #!/usr/bin/env python3
 import cereal.messaging as messaging
-from openpilot.common.params import Params
-from openpilot.common.realtime import config_realtime_process
-from openpilot.selfdrive.monitoring.policy import DriverMonitoring
+from cereal import log
+from openpilot.common.realtime import config_realtime_process, Ratekeeper
+
+# ndm: DRIVER MONITORING DISABLED FOR RESOURCE TESTING.
+# The DM neural net (dmonitoringmodeld) and the driver camera (DISABLE_DRIVER in
+# launch_env.sh) are turned off to measure their resource usage. selfdrived and
+# controlsd require `driverMonitoringState` to be alive, so this stub publishes a
+# constant "attentive" state at the normal 20Hz. The system therefore engages
+# normally with zero DM alerts and zero actual monitoring capability.
+# Revert this commit (see git history for the original policy-driven loop) to
+# restore real driver monitoring.
+
+DM_RATE_HZ = 20  # cereal/services.py: driverMonitoringState @ 20Hz
 
 
 def dmonitoringd_thread():
   config_realtime_process([0, 1, 2, 3], 5)
 
-  params = Params()
   pm = messaging.PubMaster(['driverMonitoringState'])
-  sm = messaging.SubMaster(['driverStateV2', 'liveCalibration', 'carState', 'selfdriveState', 'modelV2',
-                            'carControl'], poll='driverStateV2')
+  rk = Ratekeeper(DM_RATE_HZ, print_delay_threshold=None)
 
-  DM = DriverMonitoring(rhd_saved=params.get_bool("IsRhdDetected"), always_on=params.get_bool("AlwaysOnDM"))
-  demo_mode=False
-
-  # 20Hz <- dmonitoringmodeld
   while True:
-    sm.update()
-    if not sm.updated['driverStateV2']:
-      # iterate when model has new output
-      continue
-
-    valid = sm.all_checks()
-    if demo_mode and sm.valid['driverStateV2']:
-      DM.run_step(sm, demo=True)
-    elif valid:
-      DM.run_step(sm, demo=demo_mode)
-
-    # publish
-    dat = DM.get_state_packet(valid=valid)
+    dat = messaging.new_message('driverMonitoringState', valid=True)
+    dm = dat.driverMonitoringState
+    # everything selfdrived/controlsd inspect, pinned to "attentive / no lockout"
+    dm.alertLevel = log.DriverMonitoringState.AlertLevel.none
+    dm.activePolicy = log.DriverMonitoringState.MonitoringPolicy.vision
+    dm.lockout = False
+    dm.alwaysOn = False
+    dm.alwaysOnLockout = False
+    dm.isRHD = False
+    dm.visionPolicyState.faceDetected = True
+    dm.visionPolicyState.isDistracted = False
+    dm.visionPolicyState.awarenessPercent = 100
+    dm.visionPolicyState.uncertainOffroadAlertPercent = 0
     pm.send('driverMonitoringState', dat)
 
-    # load live always-on toggle
-    if sm['driverStateV2'].frameId % 40 == 1:
-      DM.always_on = params.get_bool("AlwaysOnDM")
-      demo_mode = params.get_bool("IsDriverViewEnabled")
+    rk.keep_time()
 
-    # save rhd virtual toggle every 5 mins
-    if (sm['driverStateV2'].frameId % 6000 == 0 and not demo_mode and
-     DM.wheelpos_offsetter.filtered_stat.n > DM.settings._WHEELPOS_FILTER_MIN_COUNT and
-     DM.wheel_on_right == (DM.wheelpos_offsetter.filtered_stat.M > DM.settings._WHEELPOS_THRESHOLD)):
-      params.put_bool("IsRhdDetected", DM.wheel_on_right)
 
 def main():
   dmonitoringd_thread()
