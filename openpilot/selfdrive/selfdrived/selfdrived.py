@@ -94,6 +94,10 @@ class SelfdriveD(CruiseHelper):
     self.car_state_sock = messaging.sub_sock('carState', timeout=20)
 
     ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan'] + ['modelDataV2SP']
+    # ndm: driver-monitoring resource test — the driver camera is disabled (DISABLE_DRIVER),
+    # so driverCameraState never publishes. Ignore it so it doesn't raise cameraMalfunction.
+    # Revert this commit to restore driver monitoring.
+    ignore += ['driverCameraState']
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
     if REPLAY:
