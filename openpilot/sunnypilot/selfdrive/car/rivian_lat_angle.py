@@ -20,8 +20,10 @@ DEFAULT_MAX_STEERING_ANGLE = 90.0
 
 
 def update_rivian_max_steering_angle(params: Params) -> None:
+  # Runs in card.py's params loop (critical), so never raise — any failure
+  # (bad/missing value, param read error) falls back to the stock cutoff.
   try:
     value = float(params.get("RivianMaxSteeringAngle", return_default=True))
-  except (TypeError, ValueError):
+  except Exception:
     value = DEFAULT_MAX_STEERING_ANGLE
   rivian_mads.MAX_STEERING_ANGLE = value
