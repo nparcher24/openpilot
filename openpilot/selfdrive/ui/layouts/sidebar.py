@@ -97,8 +97,7 @@ class Sidebar(Widget, SidebarSP):
 
   def _render(self, rect: rl.Rectangle):
     # Background
-    # ndm: fork-verification marker — teal sidebar (revert to rl.BLACK once confirmed)
-    rl.draw_rectangle_rec(rect, rl.Color(0, 168, 168, 255))
+    rl.draw_rectangle_rec(rect, rl.BLACK)
 
     self._draw_buttons(rect)
     self._draw_network_indicator(rect)
