@@ -443,7 +443,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "Take Control",
       "Turn Exceeds Steering Limit",
       AlertStatus.userPrompt, AlertSize.mid,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 2.),  # ndm: mute chime, keep orange screen + wheel icon (was AudibleAlert.promptRepeat)
   },
 
   # Thrown when the fan is driven at >50% but is not rotating
@@ -905,7 +905,7 @@ if HARDWARE.get_device_type() == 'mici':
         "take control",
         "turn exceeds limit",
         AlertStatus.userPrompt, AlertSize.mid,
-        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
+        Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 2.),  # ndm: mute chime, keep visual (was AudibleAlert.promptRepeat)
     },
     EventName.calibrationIncomplete: {
       ET.PERMANENT: calibration_incomplete_alert,
