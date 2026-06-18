@@ -52,16 +52,32 @@ def test_fast_forward_noop_when_current(repos):
   assert gitops.fast_forward_master(fork, "upstream/master") is False
 
 
+def test_fast_forward_raises_on_divergence(repos):
+  """master diverged from upstream (local commit not on upstream) → GitError."""
+  fork = str(repos["fork"])
+  # Add a local commit to master that is NOT on upstream
+  _git(fork, "checkout", "-q", "master")
+  _commit(repos["fork"], "local-only.txt", "diverge\n", "local diverging commit")
+  # Also advance upstream so they have genuinely diverged
+  _commit(repos["upstream"], "base.txt", "v2\n", "upstream advance")
+  gitops.add_upstream(fork, "upstream", str(repos["upstream"]))
+  with pytest.raises(gitops.GitError):
+    gitops.fast_forward_master(fork, "upstream/master")
+
+
 def test_rebase_clean(repos):
+  """trial branch created at ndm-dev tip, then rebased in-place onto master."""
   fork = str(repos["fork"])
   old_master = _git(repos["fork"], "rev-parse", "master")
   _commit(repos["upstream"], "base.txt", "v2\n", "upstream advance")
   gitops.add_upstream(fork, "upstream", str(repos["upstream"]))
   gitops.fast_forward_master(fork, "upstream/master")
-  gitops.create_trial_branch(fork, "sync/test", "master")
-  status = gitops.rebase_tweaks(fork, old_master, "ndm-dev", "sync/test")
+  # New convention: trial starts at ndm-dev, rebase it onto master
+  gitops.create_trial_branch(fork, "sync/test", "ndm-dev")
+  status = gitops.rebase_tweaks(fork, old_master, "sync/test", "master")
   assert status == "clean"
-  # the ndm tweak survived and sits on top of the new upstream content
+  # Verify the branch ref (not just worktree) carries the tweak on top of new upstream
+  _git(fork, "checkout", "sync/test")
   assert (repos["fork"] / "ndm.txt").read_text() == "tweak\n"
   assert (repos["fork"] / "base.txt").read_text() == "v2\n"
 
@@ -74,9 +90,80 @@ def test_rebase_conflict_left_in_progress(repos):
   _commit(repos["upstream"], "shared.txt", "upstream-version\n", "upstream edit shared")
   gitops.add_upstream(fork, "upstream", str(repos["upstream"]))
   gitops.fast_forward_master(fork, "upstream/master")
-  gitops.create_trial_branch(fork, "sync/test", "master")
-  status = gitops.rebase_tweaks(fork, old_master, "ndm-dev", "sync/test")
+  # New convention: trial starts at ndm-dev, rebase onto master
+  gitops.create_trial_branch(fork, "sync/test", "ndm-dev")
+  status = gitops.rebase_tweaks(fork, old_master, "sync/test", "master")
   assert status == "conflict"
   # a rebase is genuinely in progress for Claude to finish
   assert (repos["fork"] / ".git" / "rebase-merge").exists() or \
          (repos["fork"] / ".git" / "rebase-apply").exists()
+
+
+def test_rebase_conflict_resolved_keeps_tweaks(repos):
+  """After conflict → resolve → rebase --continue, trial branch has tweaks and ndm-dev is unchanged."""
+  fork = str(repos["fork"])
+  # Make the ndm commit and upstream both edit the SAME file → conflict
+  _commit(repos["fork"], "shared.txt", "ndm-version\n", "ndm: edit shared")
+  old_master = _git(repos["fork"], "rev-parse", "master")
+  ndm_dev_sha_before = _git(repos["fork"], "rev-parse", "ndm-dev")
+  _commit(repos["upstream"], "shared.txt", "upstream-version\n", "upstream edit shared")
+  gitops.add_upstream(fork, "upstream", str(repos["upstream"]))
+  gitops.fast_forward_master(fork, "upstream/master")
+
+  gitops.create_trial_branch(fork, "sync/test", "ndm-dev")
+  status = gitops.rebase_tweaks(fork, old_master, "sync/test", "master")
+  assert status == "conflict"
+
+  # Simulate Claude: write a resolved version and continue the rebase
+  (repos["fork"] / "shared.txt").write_text("resolved-version\n")
+  _git(fork, "add", "shared.txt")
+  subprocess.run(
+    ["git", "rebase", "--continue"],
+    cwd=fork, check=True, capture_output=True, text=True,
+    env={**__import__("os").environ, "GIT_EDITOR": "true"},
+  )
+
+  # sync/test should carry: upstream file == new content, ndm file == tweak, resolved file == resolved
+  _git(fork, "checkout", "sync/test")
+  assert (repos["fork"] / "base.txt").read_text() == "v1\n"
+  assert (repos["fork"] / "ndm.txt").read_text() == "tweak\n"
+  assert (repos["fork"] / "shared.txt").read_text() == "resolved-version\n"
+
+  # The ndm-commit subject must appear in sync/test log
+  log = _git(fork, "log", "--format=%s", "sync/test")
+  assert "ndm: edit shared" in log
+
+  # ndm-dev ref is UNCHANGED from before the rebase
+  ndm_dev_sha_after = _git(repos["fork"], "rev-parse", "ndm-dev")
+  assert ndm_dev_sha_before == ndm_dev_sha_after
+
+
+def test_force_publish_moves_remote_branch(repos, tmp_path):
+  """force_publish updates the remote branch ref to match the trial tip."""
+  fork = str(repos["fork"])
+  upstream = repos["upstream"]
+
+  # Add origin (separate bare repo to act as the push target)
+  bare = tmp_path / "bare"
+  bare.mkdir()
+  _git(bare, "init", "-q", "--bare", "-b", "master")
+  _git(fork, "remote", "add", "origin", str(bare))
+  # push ndm-dev as ndm-dev to origin so it exists there
+  _git(fork, "push", "origin", "ndm-dev:ndm-dev")
+  # Advance upstream so there's a new master to rebase onto
+  _commit(upstream, "base.txt", "v2\n", "upstream advance")
+  gitops.add_upstream(fork, "upstream", str(upstream))
+  gitops.fast_forward_master(fork, "upstream/master")
+
+  old_master = _git(repos["fork"], "rev-parse", "master~1")
+  # Create trial branch at ndm-dev tip, rebase onto master
+  gitops.create_trial_branch(fork, "sync/test", "ndm-dev")
+  status = gitops.rebase_tweaks(fork, old_master, "sync/test", "master")
+  assert status == "clean"
+
+  trial_sha = _git(repos["fork"], "rev-parse", "sync/test")
+  gitops.force_publish(fork, "sync/test", "ndm-dev")
+
+  # The remote ndm-dev ref should now equal the trial tip
+  remote_sha = _git(bare, "rev-parse", "ndm-dev")
+  assert remote_sha == trial_sha

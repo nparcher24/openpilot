@@ -77,3 +77,24 @@ def test_prepare_writes_state_and_rebases_clean(fork_with_upstream, tmp_path):
   _git(fork, "checkout", "-q", "sync/test")
   assert (fork_with_upstream["fork"] / "base.txt").read_text() == "v2\n"
   assert (fork_with_upstream["fork"] / "ndm.txt").read_text() == "tweak\n"
+
+
+def test_publish_guard_rejects_empty_trial(fork_with_upstream, tmp_path):
+  """cmd_publish returns non-zero when trial branch has no commits ahead of master."""
+  fork = str(fork_with_upstream["fork"])
+  # The fixture already has origin; point it at a bare throwaway so any
+  # accidental push attempt hits a safe target
+  bare = tmp_path / "bare"
+  bare.mkdir()
+  _git(bare, "init", "-q", "--bare", "-b", "master")
+  _git(fork, "remote", "set-url", "origin", str(bare))
+
+  # Create a trial branch that equals master (no tweaks ahead)
+  _git(fork, "checkout", "-q", "master")
+  _git(fork, "checkout", "-q", "-B", "sync/empty", "master")
+
+  # cmd_publish should refuse with non-zero exit code before pushing
+  import argparse
+  args = argparse.Namespace(repo=fork, trial_branch="sync/empty")
+  rc = sync.cmd_publish(args)
+  assert rc != 0

@@ -61,14 +61,19 @@ def cmd_prepare(args) -> int:
 
   old_shas = submodules.read_submodule_shas(repo, old_master, submodules.FORK_SUBMODULES)
   new_shas = submodules.read_submodule_shas(repo, new_master, submodules.FORK_SUBMODULES)
-  state["bumps"] = submodules.detect_bumps(old_shas, new_shas, submodules.FORK_SUBMODULES)
+  bumps = submodules.detect_bumps(old_shas, new_shas, submodules.FORK_SUBMODULES)
+  # Fail-closed: a fork submodule readable at exactly one of the two refs
+  # (present XOR absent) indicates a relocation or removal — escalate it.
+  asymmetric = [p for p in submodules.FORK_SUBMODULES if (p in old_shas) != (p in new_shas)]
+  state["bumps"] = sorted(set(bumps) | set(asymmetric))
 
-  gitops.create_trial_branch(repo, args.trial_branch, "master")
-  rebase_status = gitops.rebase_tweaks(repo, old_master, NDM_TIP, args.trial_branch)
+  # Create the trial branch starting at NDM_TIP (ndm-dev), then rebase it in
+  # place onto master.  The replayed commits land on the trial branch itself —
+  # ndm-dev is never rewritten, and on a conflict the rebase is in progress on
+  # the trial branch so the caller's git rebase --continue resolves it there.
+  gitops.create_trial_branch(repo, args.trial_branch, NDM_TIP)
+  rebase_status = gitops.rebase_tweaks(repo, old_master, args.trial_branch, "master")
   state["rebase"] = rebase_status
-  if rebase_status == "clean":
-    # rebase left HEAD detached at the replayed tip; re-point the trial branch
-    gitops.git(repo, "checkout", "-B", args.trial_branch, "HEAD")
 
   _write_state(args.state, state)
   _emit_outputs({
@@ -87,11 +92,40 @@ def cmd_gate(args) -> int:
   decision = decision_for(state, ci_passed=args.ci_passed, report_text=report_text)
   _emit_outputs({"decision": decision})
   print(f"decision={decision}")
+  if decision == "escalate":
+    # Log which condition caused escalation to aid human review.
+    try:
+      report = parse_report(report_text)
+      reasons = []
+      if not args.ci_passed:
+        reasons.append("CI failed")
+      if state.get("bumps"):
+        reasons.append(f"submodule bump(s): {state['bumps']}")
+      if state.get("rebase") == "conflict" and report.status == "clean":
+        reasons.append("conflict state contradicts clean report")
+      elif report.status not in ("clean", "resolved"):
+        reasons.append(f"report status={report.status!r}")
+      if report.confidence != "high":
+        reasons.append(f"confidence={report.confidence!r}")
+      if report.flags:
+        reasons.append(f"{len(report.flags)} flag(s) present")
+      print(f"escalate reason: {'; '.join(reasons) if reasons else 'unknown'}")
+    except ReportError:
+      print("escalate reason: unparseable or missing report")
   return 0
 
 
 def cmd_publish(args) -> int:
-  gitops.force_publish(args.repo, args.trial_branch, TARGET_BRANCH)
+  repo = args.repo
+  # Defense-in-depth: verify the trial branch actually carries commits on top of
+  # master before pushing.  An empty range means trial == master (no tweaks),
+  # which would wipe every ndm customization from the car.
+  count = int(gitops.git(repo, "rev-list", "--count", f"master..{args.trial_branch}"))
+  if count == 0:
+    print(f"error: trial branch {args.trial_branch!r} has no commits ahead of master; "
+          "refusing to publish (would overwrite ndm tweaks with bare upstream)")
+    return 1
+  gitops.force_publish(repo, args.trial_branch, TARGET_BRANCH)
   print(f"published {args.trial_branch} -> {TARGET_BRANCH}")
   return 0
 

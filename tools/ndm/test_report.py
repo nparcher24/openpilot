@@ -49,3 +49,16 @@ def test_malformed_flag_raises():
     with pytest.raises(ReportError):
         parse_report('{"status": "clean", "confidence": "high", "summary": "x",'
                      ' "flags": [{"type": "semantic"}]}')
+
+
+def test_non_dict_top_level_raises():
+    with pytest.raises(ReportError):
+        parse_report("[]")
+    with pytest.raises(ReportError):
+        parse_report("5")
+
+
+def test_non_dict_flag_entry_raises():
+    with pytest.raises(ReportError):
+        parse_report('{"status": "clean", "confidence": "high", "summary": "x",'
+                     ' "flags": [42]}')

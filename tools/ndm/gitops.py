@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 
 
@@ -43,9 +44,9 @@ def create_trial_branch(repo: str, name: str, base: str) -> None:
 def rebase_tweaks(repo: str, base_ref: str, tip_ref: str, onto: str) -> str:
   """Rebase base_ref..tip_ref onto `onto`. Returns 'clean' or 'conflict'.
 
-  On conflict the rebase is intentionally left in progress so Claude can
-  finish it; on a clean rebase the trial branch (== `onto`) now carries the
-  replayed tweaks.
+  On conflict the rebase is intentionally left in progress so the caller can
+  finish it; on a clean rebase `tip_ref` (if it is a branch) ends up carrying
+  the replayed tweaks on top of `onto`.
   """
   result = subprocess.run(
     ["git", "rebase", "--onto", onto, base_ref, tip_ref],
@@ -53,11 +54,17 @@ def rebase_tweaks(repo: str, base_ref: str, tip_ref: str, onto: str) -> str:
   )
   if result.returncode == 0:
     return "clean"
-  # distinguish a conflict (rebase paused) from a hard failure
-  status = subprocess.run(["git", "status", "--porcelain=v1"], cwd=repo,
-                          capture_output=True, text=True).stdout
-  if "UU " in status or "AA " in status or "rebase" in git(repo, "status"):
-    return "conflict"
+  # Distinguish a conflict (rebase paused) from a hard failure using the
+  # structural rebase-state directories rather than free-text git status.
+  for state_dir in ("rebase-merge", "rebase-apply"):
+    git_path = subprocess.run(
+      ["git", "rev-parse", "--git-path", state_dir],
+      cwd=repo, capture_output=True, text=True,
+    ).stdout.strip()
+    if git_path:
+      full_path = git_path if os.path.isabs(git_path) else os.path.join(repo, git_path)
+      if os.path.exists(full_path):
+        return "conflict"
   raise GitError(f"git rebase failed unexpectedly:\n{result.stderr.strip()}")
 
 
