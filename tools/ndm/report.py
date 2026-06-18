@@ -35,6 +35,9 @@ def parse_report(text: str) -> SyncReport:
   except json.JSONDecodeError as e:
     raise ReportError(f"sync-report.json is not valid JSON: {e}") from e
 
+  if not isinstance(data, dict):
+    raise ReportError(f"sync-report.json must be a JSON object, got {type(data).__name__}")
+
   for key in ("status", "confidence", "summary"):
     if key not in data:
       raise ReportError(f"missing required field: {key}")
@@ -45,6 +48,8 @@ def parse_report(text: str) -> SyncReport:
 
   flags = []
   for f in data.get("flags", []):
+    if not isinstance(f, dict):
+      raise ReportError(f"each flag must be a JSON object, got {type(f).__name__}: {f!r}")
     if not all(k in f for k in ("type", "file", "detail")):
       raise ReportError(f"flag missing required keys: {f}")
     flags.append(Flag(type=f["type"], file=f["file"], detail=f["detail"]))
