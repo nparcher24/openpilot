@@ -81,7 +81,7 @@ jobs:
         run: |
           gh workflow run tests.yaml --ref "${{ steps.name.outputs.trial }}"
           # poll the run we just kicked off on this ref
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 160); do
             sleep 30
             run_json=$(gh run list --workflow tests.yaml \
               --branch "${{ steps.name.outputs.trial }}" --limit 1 \
