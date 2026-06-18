@@ -51,6 +51,12 @@ def test_decision_for_escalates_on_bad_report(tmp_path):
   assert sync.decision_for(state, ci_passed=True, report_text="garbage") == "escalate"
 
 
+def test_decision_for_escalates_on_conflict_claims_clean():
+  state = {"rebase": "conflict", "bumps": []}
+  report = '{"status": "clean", "confidence": "high", "summary": "ok"}'
+  assert sync.decision_for(state, ci_passed=True, report_text=report) == "escalate"
+
+
 def test_prepare_writes_state_and_rebases_clean(fork_with_upstream, tmp_path):
   fork = str(fork_with_upstream["fork"])
   state_path = tmp_path / "state.json"
