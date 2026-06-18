@@ -23,3 +23,4 @@ def test_prompt_mentions_no_drop_rule():
   text = open(PROMPT).read().lower()
   assert "ndm:" in text
   assert "sync-report.json" in text
+  assert "sync-report.md" in text
