@@ -1,0 +1,133 @@
+name: ndm-sync
+
+on:
+  schedule:
+    - cron: "0 9 * * 0"   # Sundays 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Auto-publish to ndm-dev when green (false = always open a PR)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ndm-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write   # to dispatch tests.yaml
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_URL: https://github.com/sunnypilot/sunnypilot.git
+      PYTHONPATH: ${{ github.workspace }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ndm-dev
+
+      - name: Configure git identity
+        run: |
+          git config user.name "ndm-sync-bot"
+          git config user.email "ndm-sync@users.noreply.github.com"
+
+      - name: Compute trial branch name
+        id: name
+        run: echo "trial=sync/$(date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare (ff master, detect bumps, rebase)
+        id: prep
+        run: |
+          python -m openpilot.tools.ndm.sync prepare \
+            --upstream-url "$UPSTREAM_URL" \
+            --trial-branch "${{ steps.name.outputs.trial }}" \
+            --state sync-state.json
+
+      - name: Stop if nothing new
+        if: steps.prep.outputs.noop == 'true'
+        run: echo "Nothing new upstream. Done."
+
+      - name: Read sync prompt
+        id: sync_prompt
+        if: steps.prep.outputs.noop != 'true'
+        run: |
+          DELIM="$(dd if=/dev/urandom bs=15 count=1 2>/dev/null | base64)"
+          {
+            echo "content<<${DELIM}"
+            cat tools/ndm/sync-prompt.md
+            echo "${DELIM}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve conflicts + semantic review (Claude)
+        if: steps.prep.outputs.noop != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.sync_prompt.outputs.content }}
+
+      - name: Push trial branch
+        if: steps.prep.outputs.noop != 'true'
+        run: git push --force origin "${{ steps.name.outputs.trial }}"
+
+      - name: Run device build + tests against trial branch
+        id: ci
+        if: steps.prep.outputs.noop != 'true'
+        run: |
+          gh workflow run tests.yaml --ref "${{ steps.name.outputs.trial }}"
+          # poll the run we just kicked off on this ref
+          for _ in $(seq 1 60); do
+            sleep 30
+            run_json=$(gh run list --workflow tests.yaml \
+              --branch "${{ steps.name.outputs.trial }}" --limit 1 \
+              --json status,conclusion,databaseId)
+            status=$(echo "$run_json" | python3 -c "import sys,json;print(json.load(sys.stdin)[0]['status'])")
+            if [ "$status" = "completed" ]; then
+              concl=$(echo "$run_json" | python3 -c "import sys,json;print(json.load(sys.stdin)[0]['conclusion'])")
+              if [ "$concl" = "success" ]; then
+                echo "ci_passed=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "ci_passed=false" >> "$GITHUB_OUTPUT"
+              fi
+              exit 0
+            fi
+          done
+          echo "ci_passed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Gate decision
+        id: gate
+        if: steps.prep.outputs.noop != 'true'
+        run: |
+          python -m openpilot.tools.ndm.sync gate \
+            --ci-passed "${{ steps.ci.outputs.ci_passed }}" \
+            --report sync-report.json \
+            --state sync-state.json
+
+      - name: Publish (force-push ndm-dev)
+        if: >
+          steps.prep.outputs.noop != 'true' &&
+          steps.gate.outputs.decision == 'publish' &&
+          (github.event_name == 'schedule' || inputs.publish)
+        run: |
+          python -m openpilot.tools.ndm.sync publish \
+            --trial-branch "${{ steps.name.outputs.trial }}"
+
+      - name: Escalate (open review PR)
+        if: >
+          steps.prep.outputs.noop != 'true' &&
+          (steps.gate.outputs.decision == 'escalate' ||
+           (github.event_name == 'workflow_dispatch' && !inputs.publish))
+        run: |
+          body_file=sync-report.md
+          [ -f "$body_file" ] || echo "Automated sync needs review." > "$body_file"
+          gh pr create \
+            --base ndm-dev \
+            --head "${{ steps.name.outputs.trial }}" \
+            --title "ndm-sync: review ${{ steps.name.outputs.trial }}" \
+            --body-file "$body_file" \
+            --assignee nparcher24
