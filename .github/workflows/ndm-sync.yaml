@@ -41,6 +41,18 @@ jobs:
         id: name
         run: echo "trial=sync/$(date +%F)" >> "$GITHUB_OUTPUT"
 
+      - name: Read sync prompt
+        id: sync_prompt
+        # read from the clean ndm-dev checkout BEFORE the rebase; on the conflict
+        # path the rebase stops mid-stack and this file isn't yet in the worktree.
+        run: |
+          DELIM="$(dd if=/dev/urandom bs=15 count=1 2>/dev/null | base64)"
+          {
+            echo "content<<${DELIM}"
+            cat tools/ndm/sync-prompt.md
+            echo "${DELIM}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Materialize local master
         # checkout only creates the local ndm-dev branch; the sync tool needs a
         # local `master` (the fork's upstream mirror) to fast-forward and rebase onto.
@@ -57,17 +69,6 @@ jobs:
       - name: Stop if nothing new
         if: steps.prep.outputs.noop == 'true'
         run: echo "Nothing new upstream. Done."
-
-      - name: Read sync prompt
-        id: sync_prompt
-        if: steps.prep.outputs.noop != 'true'
-        run: |
-          DELIM="$(dd if=/dev/urandom bs=15 count=1 2>/dev/null | base64)"
-          {
-            echo "content<<${DELIM}"
-            cat tools/ndm/sync-prompt.md
-            echo "${DELIM}"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Resolve conflicts + semantic review (Claude)
         if: steps.prep.outputs.noop != 'true'
