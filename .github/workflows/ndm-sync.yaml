@@ -17,7 +17,8 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
-  actions: write   # to dispatch tests.yaml
+  actions: write     # to dispatch tests.yaml
+  id-token: write    # claude-code-action uses OIDC
 
 jobs:
   sync:
