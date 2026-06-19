@@ -41,6 +41,11 @@ jobs:
         id: name
         run: echo "trial=sync/$(date +%F)" >> "$GITHUB_OUTPUT"
 
+      - name: Materialize local master
+        # checkout only creates the local ndm-dev branch; the sync tool needs a
+        # local `master` (the fork's upstream mirror) to fast-forward and rebase onto.
+        run: git fetch origin master:master
+
       - name: Prepare (ff master, detect bumps, rebase)
         id: prep
         run: |
