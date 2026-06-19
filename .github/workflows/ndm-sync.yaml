@@ -76,10 +76,27 @@ jobs:
 
       - name: Resolve conflicts + semantic review (Claude)
         if: steps.prep.outputs.noop != 'true'
-        uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: ${{ steps.sync_prompt.outputs.content }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          PROMPT: ${{ steps.sync_prompt.outputs.content }}
+        # headless Claude Code CLI: operates directly on the in-progress rebase in
+        # the checkout (claude-code-action is built for PR/issue events, not this).
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          timeout 1800 claude -p "$PROMPT" --dangerously-skip-permissions
+
+      - name: Verify rebase completed
+        if: steps.prep.outputs.noop != 'true'
+        # fail safe: if Claude left the rebase unfinished, do not push/publish a
+        # half-rebased (tweak-less) trial branch.
+        run: |
+          if [ -d "$(git rev-parse --git-path rebase-merge)" ] || \
+             [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+            echo "::error::Rebase still in progress after Claude; refusing to continue."
+            git rebase --abort || true
+            exit 1
+          fi
+          echo "rebase complete"
 
       - name: Push trial branch
         if: steps.prep.outputs.noop != 'true'
