@@ -27,6 +27,9 @@ jobs:
       UPSTREAM_URL: https://github.com/sunnypilot/sunnypilot.git
       PYTHONPATH: ${{ github.workspace }}
       GH_TOKEN: ${{ github.token }}
+      # pin all gh commands to the fork; the upstream remote added during sync
+      # otherwise makes gh resolve to sunnypilot/sunnypilot (dispatch/PR 403).
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v6
         with:
