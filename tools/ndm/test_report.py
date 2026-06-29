@@ -12,10 +12,7 @@ def test_parse_minimal_clean_report():
 
 
 def test_parse_report_with_flags():
-    text = (
-        '{"status": "resolved", "confidence": "high", "summary": "done",'
-        ' "flags": [{"type": "semantic", "file": "a.py", "detail": "api moved"}]}'
-    )
+    text = '{"status": "resolved", "confidence": "high", "summary": "done", "flags": [{"type": "semantic", "file": "a.py", "detail": "api moved"}]}'
     report = parse_report(text)
     assert report.flags == [Flag(type="semantic", file="a.py", detail="api moved")]
 
@@ -47,8 +44,7 @@ def test_missing_field_raises():
 
 def test_malformed_flag_raises():
     with pytest.raises(ReportError):
-        parse_report('{"status": "clean", "confidence": "high", "summary": "x",'
-                     ' "flags": [{"type": "semantic"}]}')
+        parse_report('{"status": "clean", "confidence": "high", "summary": "x", "flags": [{"type": "semantic"}]}')
 
 
 def test_non_dict_top_level_raises():
@@ -60,5 +56,4 @@ def test_non_dict_top_level_raises():
 
 def test_non_dict_flag_entry_raises():
     with pytest.raises(ReportError):
-        parse_report('{"status": "clean", "confidence": "high", "summary": "x",'
-                     ' "flags": [42]}')
+        parse_report('{"status": "clean", "confidence": "high", "summary": "x", "flags": [42]}')
