@@ -111,7 +111,7 @@ def cmd_gate(args) -> int:
         reasons.append(f"{len(report.flags)} flag(s) present")
       print(f"escalate reason: {'; '.join(reasons) if reasons else 'unknown'}")
     except ReportError:
-      print("escalate reason: unparseable or missing report")
+      print("escalate reason: unparsable or missing report")
   return 0
 
 
