@@ -1,13 +1,13 @@
-import os
 import re
+from pathlib import Path
 
 from openpilot.tools.ndm.report import parse_report
 
-PROMPT = os.path.join(os.path.dirname(__file__), "sync-prompt.md")
+PROMPT = Path(__file__).parent / "sync-prompt.md"
 
 
 def _example_json() -> str:
-  text = open(PROMPT).read()
+  text = PROMPT.read_text()
   match = re.search(r"```json\n(.*?)\n```", text, re.DOTALL)
   assert match, "sync-prompt.md must contain a ```json example block"
   return match.group(1)
@@ -20,7 +20,7 @@ def test_prompt_example_matches_schema():
 
 
 def test_prompt_mentions_no_drop_rule():
-  text = open(PROMPT).read().lower()
+  text = PROMPT.read_text().lower()
   assert "ndm:" in text
   assert "sync-report.json" in text
   assert "sync-report.md" in text

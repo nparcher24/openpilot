@@ -19,7 +19,8 @@ def fork_with_upstream(tmp_path):
   _git(upstream, "config", "user.email", "t@t")
   _git(upstream, "config", "user.name", "t")
   (upstream / "base.txt").write_text("v1\n")
-  _git(upstream, "add", "."); _git(upstream, "commit", "-qm", "base")
+  _git(upstream, "add", ".")
+  _git(upstream, "commit", "-qm", "base")
 
   fork = tmp_path / "fork"
   _git(tmp_path, "clone", "-q", str(upstream), "fork")
@@ -27,10 +28,12 @@ def fork_with_upstream(tmp_path):
   _git(fork, "config", "user.name", "t")
   _git(fork, "checkout", "-q", "-b", "ndm-dev")
   (fork / "ndm.txt").write_text("tweak\n")
-  _git(fork, "add", "."); _git(fork, "commit", "-qm", "ndm: tweak")
+  _git(fork, "add", ".")
+  _git(fork, "commit", "-qm", "ndm: tweak")
   # advance upstream so there is something to sync
   (upstream / "base.txt").write_text("v2\n")
-  _git(upstream, "add", "."); _git(upstream, "commit", "-qm", "advance")
+  _git(upstream, "add", ".")
+  _git(upstream, "commit", "-qm", "advance")
   return {"upstream": upstream, "fork": fork}
 
 

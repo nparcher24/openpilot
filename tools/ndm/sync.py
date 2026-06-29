@@ -122,8 +122,7 @@ def cmd_publish(args) -> int:
   # which would wipe every ndm customization from the car.
   count = int(gitops.git(repo, "rev-list", "--count", f"master..{args.trial_branch}"))
   if count == 0:
-    print(f"error: trial branch {args.trial_branch!r} has no commits ahead of master; "
-          "refusing to publish (would overwrite ndm tweaks with bare upstream)")
+    print(f"error: trial branch {args.trial_branch!r} has no commits ahead of master; refusing to publish (would overwrite ndm tweaks)")
     return 1
   gitops.force_publish(repo, args.trial_branch, TARGET_BRANCH)
   print(f"published {args.trial_branch} -> {TARGET_BRANCH}")
