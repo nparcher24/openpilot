@@ -61,7 +61,7 @@ This is how "don't mess with my changes" is enforced beyond textual conflicts. F
 - Any failure → **Escalate** (attach failing job logs/links).
 
 ### 6. Gate → Publish or Escalate
-**Publish** (force-push `sync/<date>` → `ndm-dev`) **iff all** hold:
+**Publish** (force-push `sync/<date>` → `ndm-dev`) **only if all** hold:
 - CI required jobs are green, **and**
 - rebase status ∈ {`clean`, `resolved`}, **and**
 - Claude confidence is `high`, **and**
