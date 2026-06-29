@@ -14,7 +14,7 @@
 - **`ndm-dev` is mutated ONLY at the final publish step.** No earlier stage may touch it. Every failure path leaves `ndm-dev` exactly as it was.
 - **`master` is only ever fast-forwarded.** If it cannot fast-forward to `upstream/master`, escalate — never force or rewrite `master`.
 - **Force-push to `ndm-dev` is safe** for the device (the on-device updater hard-resets to the remote branch); rebasing is therefore acceptable.
-- **Publish gate — force-push `ndm-dev` IFF ALL hold:** CI required jobs green **and** rebase status ∈ {`clean`, `resolved`} **and** report confidence == `high` **and** zero blocking flags (including submodule bumps). Anything else → escalate.
+- **Publish gate — force-push `ndm-dev` ONLY IF ALL hold:** CI required jobs green **and** rebase status ∈ {`clean`, `resolved`} **and** report confidence == `high` **and** zero blocking flags (including submodule bumps). Anything else → escalate.
 - **Fork submodules = `["opendbc"]`.** v1 detects an upstream bump of these and treats it as a blocking flag (notify-only); it does NOT auto-rebase the fork.
 - **Claude auth in CI:** `CLAUDE_CODE_OAUTH_TOKEN` secret (owner's Claude Max subscription, no API billing).
 - **Imports:** use the `openpilot.` package prefix, e.g. `from openpilot.tools.ndm.report import SyncReport`.
