@@ -31,8 +31,7 @@ def fast_forward_master(repo: str, upstream_ref: str) -> bool:
   # merge-base must equal local for a fast-forward; otherwise refuse
   base = git(repo, "merge-base", "master", upstream_ref)
   if base != local:
-    raise GitError(f"master cannot fast-forward to {upstream_ref} "
-                   f"(local {local[:9]} is not an ancestor)")
+    raise GitError(f"master cannot fast-forward to {upstream_ref} (local {local[:9]} is not an ancestor)")
   git(repo, "merge", "--ff-only", upstream_ref)
   return True
 
