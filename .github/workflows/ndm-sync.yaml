@@ -35,6 +35,10 @@ jobs:
         with:
           fetch-depth: 0
           ref: ndm-dev
+          # the built-in GITHUB_TOKEN cannot push changes to .github/workflows/*,
+          # which upstream syncs routinely include. A PAT with `workflow` scope can.
+          # Falls back to the default token until NDM_SYNC_PAT is configured.
+          token: ${{ secrets.NDM_SYNC_PAT || github.token }}
 
       - name: Configure git identity
         run: |
