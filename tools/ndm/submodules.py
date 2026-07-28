@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import subprocess
 
-FORK_SUBMODULES = ["opendbc"]
+# Submodule *paths* (gitlink entries), not names. The opendbc submodule is
+# named "opendbc" but lives at path "opendbc_repo"; a symlink blob named
+# "opendbc" shadows it, so `git rev-parse <ref>:opendbc` silently returns a blob
+# SHA that never moves — using the name here quietly disabled bump detection.
+FORK_SUBMODULES = ["opendbc_repo"]
 
 
 def detect_bumps(old_shas: dict[str, str], new_shas: dict[str, str],
