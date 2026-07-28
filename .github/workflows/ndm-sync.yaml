@@ -27,6 +27,10 @@ jobs:
       UPSTREAM_URL: https://github.com/sunnypilot/sunnypilot.git
       PYTHONPATH: ${{ github.workspace }}
       GH_TOKEN: ${{ github.token }}
+      # LFS binaries (fonts, .onnx models) live on sunnypilot's GitLab and the
+      # device fetches them there — never from this GitHub fork. Skip smudge so
+      # in-repo checkouts/rebases don't try to download them.
+      GIT_LFS_SKIP_SMUDGE: "1"
       # pin all gh commands to the fork; the upstream remote added during sync
       # otherwise makes gh resolve to sunnypilot/sunnypilot (dispatch/PR 403).
       GH_REPO: ${{ github.repository }}
@@ -78,6 +82,15 @@ jobs:
         if: steps.prep.outputs.noop == 'true'
         run: echo "Nothing new upstream. Done."
 
+      - name: Mirror master to origin
+        if: steps.prep.outputs.noop != 'true'
+        # Keep origin/master a pristine upstream mirror (prepare fast-forwarded
+        # local master). Best-effort: the sync re-derives master every run, so a
+        # failure here (e.g. upstream touched .github/workflows and the fallback
+        # GITHUB_TOKEN lacks `workflow` scope) must not block the sync itself.
+        continue-on-error: true
+        run: git push --no-verify origin master
+
       - name: Resolve conflicts + semantic review (Claude)
         if: steps.prep.outputs.noop != 'true'
         env:
@@ -104,7 +117,12 @@ jobs:
 
       - name: Push trial branch
         if: steps.prep.outputs.noop != 'true'
-        run: git push --force origin "${{ steps.name.outputs.trial }}"
+        # --no-verify skips git-lfs's pre-push hook, which would otherwise try to
+        # upload LFS objects to sunnypilot's GitLab over SSH (no key on the runner
+        # → "Host key verification failed"). The objects already exist upstream;
+        # only the LFS *pointers* need to reach GitHub, and those push as normal
+        # git blobs.
+        run: git push --no-verify --force origin "${{ steps.name.outputs.trial }}"
 
       - name: Run device build + tests against trial branch
         id: ci
@@ -162,3 +180,26 @@ jobs:
             --title "ndm-sync: review ${{ steps.name.outputs.trial }}" \
             --body-file "$body_file" \
             --assignee nparcher24
+
+      - name: Notify on failure
+        # A hard failure (push rejected, CI-dispatch error, Claude timeout, …)
+        # otherwise dies silently — the escalation PR only covers the *gated*
+        # path. Surface it as a single, deduplicated GitHub issue so a broken
+        # sync can't sit unnoticed for weeks.
+        if: failure()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="ndm-sync failed: ${{ steps.name.outputs.trial }}"
+          existing="$(gh issue list --state open --label ndm-sync-failure \
+            --json number --jq '.[0].number' 2>/dev/null || true)"
+          # Ensure the label exists (first run in a fresh repo won't have it).
+          gh label create ndm-sync-failure --color B60205 \
+            --description "Automated upstream-sync run failed" 2>/dev/null || true
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Another sync run failed: ${RUN_URL}"
+          else
+            gh issue create --title "$title" --label ndm-sync-failure \
+              --assignee nparcher24 \
+              --body "The autonomous upstream-sync run failed. Logs: ${RUN_URL} — close this issue once the sync is green again."
+          fi
