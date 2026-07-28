@@ -6,8 +6,21 @@ Keeps `ndm-dev` = latest sunnypilot upstream + the `ndm:` tweaks, automatically.
 1. Generate a Claude Code OAuth token on your machine: `claude setup-token`.
 2. Add it as repo secret `CLAUDE_CODE_OAUTH_TOKEN`
    (GitHub → Settings → Secrets and variables → Actions).
-3. Confirm Actions can create PRs: Settings → Actions → General →
+3. Create a **`NDM_SYNC_PAT`** secret — a classic PAT (or fine-grained token)
+   with the **`workflow`** scope on this repo. **Required:** upstream syncs
+   routinely edit `.github/workflows/*`, and the built-in `GITHUB_TOKEN` is
+   refused when a push touches workflow files (`refusing to allow a GitHub App
+   to create or update workflow …`). Without this secret the run falls back to
+   `GITHUB_TOKEN` and every such sync fails at the push step.
+4. Confirm Actions can create PRs: Settings → Actions → General →
    "Allow GitHub Actions to create and approve pull requests".
+
+### LFS note
+The runner pushes with `--no-verify` and `GIT_LFS_SKIP_SMUDGE=1`: the LFS
+binaries (fonts, `.onnx` models) already live on sunnypilot's GitLab and the
+device fetches them there, so the runner never uploads LFS objects (it has no
+SSH key for GitLab). Only the LFS *pointers* travel to GitHub, as normal git
+blobs.
 
 ## How it runs
 - Weekly (Sun 09:00 UTC) and on demand (Actions → ndm-sync → Run workflow).
@@ -17,6 +30,9 @@ Keeps `ndm-dev` = latest sunnypilot upstream + the `ndm:` tweaks, automatically.
   - **all green & low risk →** force-pushes `ndm-dev`. Your car picks it up on
     its next Settings → Software → check-for-update.
   - **anything risky →** opens a PR assigned to you; `ndm-dev` is untouched.
+  - **hard failure (push rejected, CI error, timeout) →** opens/updates a
+    deduplicated `ndm-sync-failure` issue assigned to you, so a broken sync
+    can't sit unnoticed. Close it once the sync is green again.
 
 ## Building trust (dry-run)
 Manual runs default to `publish=false`: they always open a PR instead of

@@ -69,4 +69,7 @@ def rebase_tweaks(repo: str, base_ref: str, tip_ref: str, onto: str) -> str:
 
 def force_publish(repo: str, trial_branch: str, target_branch: str) -> None:
   git(repo, "branch", "--force", target_branch, trial_branch)
-  git(repo, "push", "--force", "origin", target_branch)
+  # --no-verify skips git-lfs's pre-push hook: LFS binaries already live on
+  # sunnypilot's GitLab (fetched by the device there, not from GitHub), so the
+  # runner has nothing to upload and no SSH key to reach GitLab with anyway.
+  git(repo, "push", "--no-verify", "--force", "origin", target_branch)
