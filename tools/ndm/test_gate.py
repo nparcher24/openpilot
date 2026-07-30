@@ -1,5 +1,5 @@
-from openpilot.tools.ndm.gate import decide
-from openpilot.tools.ndm.report import Flag, SyncReport
+from tools.ndm.gate import decide  # noqa: TID251
+from tools.ndm.report import Flag, SyncReport  # noqa: TID251
 
 
 def _ok_report():

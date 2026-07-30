@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from openpilot.tools.ndm import gitops
+from tools.ndm import gitops  # noqa: TID251
 
 
 def _git(cwd, *args):

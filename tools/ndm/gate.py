@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from openpilot.tools.ndm.report import SyncReport
+from tools.ndm.report import SyncReport  # noqa: TID251
 
 PUBLISHABLE_STATUS = {"clean", "resolved"}
 
