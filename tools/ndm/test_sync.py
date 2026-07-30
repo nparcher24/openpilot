@@ -82,6 +82,57 @@ def test_prepare_writes_state_and_rebases_clean(fork_with_upstream, tmp_path):
   assert (fork_with_upstream["fork"] / "ndm.txt").read_text() == "tweak\n"
 
 
+def test_prepare_syncs_when_master_already_at_upstream_tip(fork_with_upstream, tmp_path):
+  """Regression: noop must mean 'ndm-dev already contains upstream', NOT 'master
+  did not move this run'. A prior run's Mirror step can advance master to the
+  upstream tip while ndm-dev is still behind; the sync must still rebase, else it
+  goes no-op forever and the backlog never lands."""
+  fork = str(fork_with_upstream["fork"])
+  upstream = str(fork_with_upstream["upstream"])
+  # Simulate the prior Mirror step: local master == upstream tip, ndm-dev behind.
+  _git(fork, "fetch", "-q", upstream, "master")
+  _git(fork, "checkout", "-q", "master")
+  _git(fork, "reset", "-q", "--hard", "FETCH_HEAD")
+  _git(fork, "checkout", "-q", "ndm-dev")
+
+  state_path = tmp_path / "state.json"
+  rc = sync.main([
+    "prepare",
+    "--upstream-url", upstream,
+    "--trial-branch", "sync/test",
+    "--repo", fork,
+    "--state", str(state_path),
+  ])
+  assert rc == 0
+  state = json.loads(state_path.read_text())
+  assert state["noop"] is False          # was True under the old master-moved logic
+  assert state["rebase"] == "clean"
+  _git(fork, "checkout", "-q", "sync/test")
+  assert (fork_with_upstream["fork"] / "base.txt").read_text() == "v2\n"
+  assert (fork_with_upstream["fork"] / "ndm.txt").read_text() == "tweak\n"
+
+
+def test_prepare_is_noop_when_ndm_dev_already_contains_upstream(fork_with_upstream, tmp_path):
+  """The genuine no-op: ndm-dev already sits on top of the upstream tip."""
+  fork = str(fork_with_upstream["fork"])
+  upstream = str(fork_with_upstream["upstream"])
+  # Rebase ndm-dev onto the advanced upstream so it already contains the tip.
+  _git(fork, "fetch", "-q", upstream, "master")
+  _git(fork, "rebase", "-q", "FETCH_HEAD", "ndm-dev")
+
+  state_path = tmp_path / "state.json"
+  rc = sync.main([
+    "prepare",
+    "--upstream-url", upstream,
+    "--trial-branch", "sync/test",
+    "--repo", fork,
+    "--state", str(state_path),
+  ])
+  assert rc == 0
+  state = json.loads(state_path.read_text())
+  assert state["noop"] is True
+
+
 def test_publish_guard_rejects_empty_trial(fork_with_upstream, tmp_path):
   """cmd_publish returns non-zero when trial branch has no commits ahead of master."""
   fork = str(fork_with_upstream["fork"])
