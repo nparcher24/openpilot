@@ -1,6 +1,6 @@
 import pytest
 
-from openpilot.tools.ndm.report import Flag, SyncReport, parse_report, ReportError
+from tools.ndm.report import Flag, SyncReport, parse_report, ReportError  # noqa: TID251
 
 
 def test_parse_minimal_clean_report():

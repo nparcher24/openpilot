@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-from openpilot.tools.ndm import sync
+from tools.ndm import sync  # noqa: TID251
 
 
 def _git(cwd, *args):
