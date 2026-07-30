@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from openpilot.tools.ndm.report import parse_report
+from tools.ndm.report import parse_report  # noqa: TID251
 
 PROMPT = Path(__file__).parent / "sync-prompt.md"
 

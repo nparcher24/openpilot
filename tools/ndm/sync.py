@@ -5,9 +5,16 @@ import json
 import os
 import sys
 
-from openpilot.tools.ndm import gitops, submodules
-from openpilot.tools.ndm.gate import decide
-from openpilot.tools.ndm.report import ReportError, parse_report
+# Import via the root `tools` package, NOT `openpilot.tools` (which the repo's
+# TID251 rule otherwise mandates). This tooling must run on two tree layouts in
+# one job: the pre-rebase ndm-dev checkout, where `openpilot/tools` is a symlink
+# to `../tools`, and the post-rebase trial branch, where upstream has since made
+# `openpilot/tools` a REAL package directory that does not contain `ndm/`. Only
+# the root `tools.ndm` path resolves on both — hence `# noqa: TID251`. Invoke as
+# `python -m tools.ndm.sync` with the repo root on PYTHONPATH.
+from tools.ndm import gitops, submodules  # noqa: TID251
+from tools.ndm.gate import decide  # noqa: TID251
+from tools.ndm.report import ReportError, parse_report  # noqa: TID251
 
 TARGET_BRANCH = "ndm-dev"
 NDM_TIP = "ndm-dev"
