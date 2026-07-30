@@ -17,6 +17,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  issues: write      # "Notify on failure" opens/updates the ndm-sync-failure issue
   actions: write     # to dispatch tests.yaml
   id-token: write    # claude-code-action uses OIDC
 
@@ -73,7 +74,7 @@ jobs:
       - name: Prepare (ff master, detect bumps, rebase)
         id: prep
         run: |
-          python -m openpilot.tools.ndm.sync prepare \
+          python -m tools.ndm.sync prepare \
             --upstream-url "$UPSTREAM_URL" \
             --trial-branch "${{ steps.name.outputs.trial }}" \
             --state sync-state.json
@@ -152,7 +153,7 @@ jobs:
         id: gate
         if: steps.prep.outputs.noop != 'true'
         run: |
-          python -m openpilot.tools.ndm.sync gate \
+          python -m tools.ndm.sync gate \
             --ci-passed "${{ steps.ci.outputs.ci_passed }}" \
             --report sync-report.json \
             --state sync-state.json
@@ -163,7 +164,7 @@ jobs:
           steps.gate.outputs.decision == 'publish' &&
           (github.event_name == 'schedule' || inputs.publish)
         run: |
-          python -m openpilot.tools.ndm.sync publish \
+          python -m tools.ndm.sync publish \
             --trial-branch "${{ steps.name.outputs.trial }}"
 
       - name: Escalate (open review PR)
