@@ -45,25 +45,37 @@ def decision_for(state: dict, *, ci_passed: bool, report_text: str) -> str:
 def cmd_prepare(args) -> int:
   repo = args.repo
   gitops.add_upstream(repo, UPSTREAM_REMOTE, args.upstream_url)
-  old_master = gitops.git(repo, "rev-parse", "master")
   upstream_ref = f"{UPSTREAM_REMOTE}/master"
 
-  moved = gitops.fast_forward_master(repo, upstream_ref)
-  new_master = gitops.git(repo, "rev-parse", "master")
+  # Mirror local master up to the upstream tip (safety-checked fast-forward).
+  # This is pristine-mirror maintenance only; it deliberately does NOT decide
+  # noop. Keying noop off "did master move this run?" wedges the sync into a
+  # permanent no-op once the Mirror step (or any prior run) has already advanced
+  # master to the upstream tip while ndm-dev is still behind.
+  gitops.fast_forward_master(repo, upstream_ref)
+
+  new_master = gitops.git(repo, "rev-parse", upstream_ref)
+  # old_master = the upstream commit ndm-dev's tweaks currently sit on. Deriving
+  # it from the merge-base (not the master pointer) makes noop, bump detection,
+  # and the rebase range all key off where ndm-dev actually is.
+  old_master = gitops.git(repo, "merge-base", NDM_TIP, upstream_ref)
+
+  # noop iff ndm-dev already contains the upstream tip (tweaks already rebased).
+  noop = old_master == new_master
 
   state = {
     "old_master": old_master,
     "new_master": new_master,
     "trial_branch": args.trial_branch,
-    "noop": not moved,
+    "noop": noop,
     "rebase": None,
     "bumps": [],
   }
 
-  if not moved:
+  if noop:
     _write_state(args.state, state)
     _emit_outputs({"noop": "true"})
-    print("nothing new upstream; no-op")
+    print("ndm-dev already contains the upstream tip; no-op")
     return 0
 
   old_shas = submodules.read_submodule_shas(repo, old_master, submodules.FORK_SUBMODULES)
