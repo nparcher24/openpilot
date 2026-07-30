@@ -19,7 +19,8 @@ permissions:
   pull-requests: write
   issues: write      # "Notify on failure" opens/updates the ndm-sync-failure issue
   actions: write     # to dispatch tests.yaml
-  id-token: write    # claude-code-action uses OIDC
+  # (no id-token: the sync uses the headless `claude -p` CLI with an OAuth token,
+  #  not claude-code-action's OIDC flow, so no id-token permission is needed.)
 
 jobs:
   sync:
