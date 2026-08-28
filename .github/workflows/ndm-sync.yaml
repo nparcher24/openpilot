@@ -1,8 +1,17 @@
 name: ndm-sync
 
+# DISABLED 2026-08-28. The weekly schedule ran fine and produced correct sync
+# branches, but scheduled runs never pass the `publish` input, so `publish` was
+# always false and every run stopped at "open a PR". Those PRs (#3/#4/#5) went
+# unmerged and ndm-dev drifted 287 commits behind upstream. Rather than leave a
+# cron piling up stale PRs, the schedule is removed and the workflow is disabled
+# in the Actions tab. Syncs are manual for now.
+# To re-enable: restore the `schedule:` block below, set the `publish` default to
+# true (otherwise the same silent-stall returns), and run `gh workflow enable
+# ndm-sync.yaml -R nparcher24/openpilot`.
 on:
-  schedule:
-    - cron: "0 9 * * 0"   # Sundays 09:00 UTC
+  # schedule:
+  #   - cron: "0 9 * * 0"   # Sundays 09:00 UTC
   workflow_dispatch:
     inputs:
       publish:
