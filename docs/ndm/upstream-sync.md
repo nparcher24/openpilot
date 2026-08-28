@@ -22,8 +22,24 @@ device fetches them there, so the runner never uploads LFS objects (it has no
 SSH key for GitLab). Only the LFS *pointers* travel to GitHub, as normal git
 blobs.
 
+## Status: DISABLED (2026-08-28)
+The weekly schedule is commented out and the workflow is disabled in the Actions
+tab. It was not broken — it ran every Sunday, rebased cleanly, and wrote good PR
+writeups. It just never *published*: see "The silent stall" below. Syncs are
+manual for now; re-enable per the note at the top of
+`.github/workflows/ndm-sync.yaml`.
+
+## The silent stall (why this was disabled)
+`workflow_dispatch.inputs.publish` defaults to `false`, and a **scheduled** run
+passes no inputs at all — so on the schedule path `publish` was always falsy and
+every run took the "open a PR" branch. The runbook used to claim the weekly run
+auto-publishes; it never did. PRs #3 (08-02), #4 (08-16) and #5 (08-23) piled up
+unmerged while `ndm-dev` drifted 287 commits behind upstream. If you re-enable
+the schedule, flip the `publish` default to `true` as well, or this recurs
+silently — nothing alerts on it, because the run *succeeds*.
+
 ## How it runs
-- Weekly (Sun 09:00 UTC) and on demand (Actions → ndm-sync → Run workflow).
+- On demand only (Actions → ndm-sync → Run workflow). Weekly cron removed.
 - It fast-forwards `master`, rebases the `ndm:` commits onto a `sync/<date>`
   branch, has Claude resolve conflicts + review, runs `tests.yaml`
   (incl. `build.py`, the device's on-boot build) against that branch, then:
@@ -34,11 +50,11 @@ blobs.
     deduplicated `ndm-sync-failure` issue assigned to you, so a broken sync
     can't sit unnoticed. Close it once the sync is green again.
 
-## Building trust (dry-run)
-Manual runs default to `publish=false`: they always open a PR instead of
-pushing, so you can watch several real syncs first. Once confident, the weekly
-scheduled run auto-publishes. To force a manual run to auto-publish, set the
-`publish` input to true.
+## Publishing
+Runs default to `publish=false`: they always open a PR instead of pushing. To
+make a run auto-publish, set the `publish` input to true when dispatching it.
+Scheduled runs could never do this (see "The silent stall") — that gap is the
+reason the schedule is off.
 
 ## When a PR shows up
 Review Claude's writeup (PR body) and the diff. If good, merge; the next sync
