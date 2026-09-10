@@ -101,7 +101,7 @@ class RivianSettings(BrandSettings):
     self.follow_distance = option_item_sp(
       title=lambda: tr("Follow Distance"),
       param="RivianFollowDistance",
-      min_value=70,
+      min_value=30,
       max_value=100,
       value_change_step=5,
       description="",
@@ -184,21 +184,34 @@ class RivianSettings(BrandSettings):
     active = _active_personality()
 
     # gap = t_follow * v + stop_distance. Show every personality so this can be dialled
-    # in per personality, with the selected one marked.
+    # in per personality, with the selected one marked. Time gap (gap / v) is the number
+    # that actually says how much room there is, so quote it alongside the distance.
     rows = []
     for value, name, t_follow in _PERSONALITIES:
       gap = t_follow * scale * v_ref + stop_distance
-      row = f"{tr(name)}: {_distance(gap)}"
+      row = f"{tr(name)}: {_distance(gap)} ({gap / v_ref:.2f} s)"
       rows.append(f"<b>► {row}</b>" if value == active else f"&nbsp;&nbsp;&nbsp;{row}")
+
+    active_t = next((t for value, _, t in _PERSONALITIES if value == active), 1.45)
+    time_gap = (active_t * scale * v_ref + stop_distance) / v_ref
 
     desc = tr("Trims the following distance of whichever personality is selected — 100% is that " +
               "personality's stock headway. The gap is the personality's follow time × your speed, plus " +
-              "the Stopping Distance below, so this is the only setting that scales the gap with speed.")
-    warn = tr("Below 100% you have less room to the car ahead, and openpilot's braking authority does " +
-              "not grow to match. Step down gradually.")
+              "the Stopping Distance below. Those are the only two terms in the gap, and this is the " +
+              "only one of them that scales with speed.")
     header = tr("Gap at {}").format(speed_label)
 
-    prefix = f"<b>{warn}</b><br><br>" if scale < 1.0 else ""
+    if time_gap < 1.0:
+      warn = tr("Under a 1.0 second time gap. At this setting openpilot has less room than a person " +
+                "needs to react, and its braking authority does not grow to match — the lead braking " +
+                "hard is the case that bites. Know what you are choosing here.")
+    elif scale < 1.0:
+      warn = tr("Below 100% you have less room to the car ahead, and openpilot's braking authority " +
+                "does not grow to match. Step down gradually.")
+    else:
+      warn = ""
+
+    prefix = f"<b>{warn}</b><br><br>" if warn else ""
 
     return (f"{desc}<br><br>{prefix}<b>{header}</b><br>{'<br>'.join(rows)}"
             f"<br><br>{_personality_note(True)}")
