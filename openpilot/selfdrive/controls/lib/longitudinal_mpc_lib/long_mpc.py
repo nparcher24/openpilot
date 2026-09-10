@@ -223,6 +223,7 @@ class LongitudinalMpc:
     # ndm: overridden live from RivianLongTuning; stock values are the defaults
     self.comfort_brake = COMFORT_BRAKE
     self.stop_distance = STOP_DISTANCE
+    self.follow_scale = 1.0
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
     self.source = LongitudinalPlanSource.cruise
@@ -317,7 +318,9 @@ class LongitudinalMpc:
     return lead_xv
 
   def update(self, radarstate, personality=log.LongitudinalPersonality.standard):
-    t_follow = get_T_FOLLOW(personality)
+    # ndm: follow_scale trims the selected personality's T_FOLLOW; t_follow is already
+    # an acados runtime parameter (p[4]), so this needs no solver regeneration
+    t_follow = get_T_FOLLOW(personality) * self.follow_scale
 
     lead_xv_0 = self.process_lead(radarstate.leadOne)
     lead_xv_1 = self.process_lead(radarstate.leadTwo)
