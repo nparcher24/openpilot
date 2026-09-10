@@ -18,6 +18,46 @@ _ACCEL_MAX = 2.0    # opendbc ACCEL_MAX; also the panda limit in safety/modes/ri
 _ACCEL_MIN = 3.5    # opendbc ACCEL_MIN, as a magnitude
 _M_TO_FT = 3.281
 
+# ndm: LongitudinalPersonality enum value -> (label, T_FOLLOW) from long_mpc.get_T_FOLLOW.
+# The personality button is the only thing that moves T_FOLLOW, and T_FOLLOW is the only
+# term in the follow-distance formula that scales with speed, so every longitudinal
+# setting below states whether the personality applies to it.
+_PERSONALITIES = ((0, "Aggressive", 1.25), (1, "Standard", 1.45), (2, "Relaxed", 1.75))
+_DEFAULT_PERSONALITY = 1
+
+# reference speed the descriptions quote distances at
+_REF_MPH, _REF_KPH = 70, 110
+_MPH_TO_MS, _KPH_TO_MS = 0.44704, 1 / 3.6
+
+
+def _active_personality() -> int:
+  # Renders every frame, so never raise -- fall back to Standard on any read failure.
+  try:
+    return int(ui_state.params.get("LongitudinalPersonality", return_default=True))
+  except Exception:
+    return _DEFAULT_PERSONALITY
+
+
+def _ref_speed() -> tuple[float, str]:
+  """Reference speed the descriptions quote distances at, as (m/s, label)."""
+  if ui_state.is_metric:
+    return _REF_KPH * _KPH_TO_MS, f"{_REF_KPH} km/h"
+  return _REF_MPH * _MPH_TO_MS, f"{_REF_MPH} mph"
+
+
+def _distance(meters: float) -> str:
+  return f"{meters:.0f} m" if ui_state.is_metric else f"{meters * _M_TO_FT:.0f} ft"
+
+
+def _personality_note(applies: bool) -> str:
+  """One line on every longitudinal setting saying whether the personality button
+  changes it, naming the personality currently selected."""
+  if not applies:
+    return tr("Not affected by the personality button.")
+
+  label = next((name for value, name, _ in _PERSONALITIES if value == _active_personality()), "Standard")
+  return tr("Affected by the personality button — currently <b>{}</b>.").format(tr(label))
+
 
 class RivianSettings(BrandSettings):
   def __init__(self):
@@ -36,7 +76,8 @@ class RivianSettings(BrandSettings):
     )
 
     # ndm: longitudinal comfort tuning. Backed by RivianAccelProfile / RivianDecelProfile /
-    # RivianComfortBrake / RivianStopDistance; read once a second by plannerd (no restart).
+    # RivianFollowDistance / RivianComfortBrake / RivianStopDistance; read once a second
+    # by plannerd (no restart needed).
     self.accel_profile = option_item_sp(
       title=lambda: tr("Acceleration Aggressiveness"),
       param="RivianAccelProfile",
@@ -53,6 +94,16 @@ class RivianSettings(BrandSettings):
       min_value=100,
       max_value=200,
       value_change_step=10,
+      description="",
+      label_callback=lambda v: f"{v}%",
+    )
+
+    self.follow_distance = option_item_sp(
+      title=lambda: tr("Follow Distance"),
+      param="RivianFollowDistance",
+      min_value=70,
+      max_value=100,
+      value_change_step=5,
       description="",
       label_callback=lambda v: f"{v}%",
     )
@@ -81,6 +132,7 @@ class RivianSettings(BrandSettings):
       self.max_steering_angle,
       self.accel_profile,
       self.decel_profile,
+      self.follow_distance,
       self.comfort_brake,
       self.stop_distance,
     ]
@@ -99,6 +151,7 @@ class RivianSettings(BrandSettings):
 
     self.accel_profile.set_description(self._accel_description())
     self.decel_profile.set_description(self._decel_description())
+    self.follow_distance.set_description(self._follow_distance_description())
     self.comfort_brake.set_description(self._comfort_brake_description())
     self.stop_distance.set_description(self._stop_distance_description())
 
@@ -112,34 +165,72 @@ class RivianSettings(BrandSettings):
               "panda enforces.")
     note = tr("Only applies in normal (chill) mode — Experimental Mode already allows the full 2.0 m/s².")
 
-    return f"{desc}<br><br><b>{tr('Resulting limit')}</b> — {table} m/s²<br><br>{note}"
+    return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — {table} m/s²"
+            f"<br><br>{note}<br>{_personality_note(False)}")
 
   def _decel_description(self) -> str:
     limit = min(_STOCK_DECEL * self.decel_profile.action_item.get_value() / 100.0, _ACCEL_MIN)
 
     desc = tr("Scales how hard openpilot slows down to reach a lower set speed or speed limit. Stock is " +
-              "-1.2 m/s². This does not change braking for a lead car — that comes from the model and is " +
-              "controlled by the two settings below.")
+              "-1.2 m/s². This does not change braking for a lead car — that is Lead Braking Assertiveness.")
 
-    return f"{desc}<br><br><b>{tr('Resulting limit')}</b> — -{limit:.1f} m/s²"
+    return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — -{limit:.1f} m/s²"
+            f"<br><br>{_personality_note(False)}")
+
+  def _follow_distance_description(self) -> str:
+    scale = self.follow_distance.action_item.get_value() / 100.0
+    stop_distance = self.stop_distance.action_item.get_value()
+    v_ref, speed_label = _ref_speed()
+    active = _active_personality()
+
+    # gap = t_follow * v + stop_distance. Show every personality so this can be dialled
+    # in per personality, with the selected one marked.
+    rows = []
+    for value, name, t_follow in _PERSONALITIES:
+      gap = t_follow * scale * v_ref + stop_distance
+      row = f"{tr(name)}: {_distance(gap)}"
+      rows.append(f"<b>► {row}</b>" if value == active else f"&nbsp;&nbsp;&nbsp;{row}")
+
+    desc = tr("Trims the following distance of whichever personality is selected — 100% is that " +
+              "personality's stock headway. The gap is the personality's follow time × your speed, plus " +
+              "the Stopping Distance below, so this is the only setting that scales the gap with speed.")
+    warn = tr("Below 100% you have less room to the car ahead, and openpilot's braking authority does " +
+              "not grow to match. Step down gradually.")
+    header = tr("Gap at {}").format(speed_label)
+
+    prefix = f"<b>{warn}</b><br><br>" if scale < 1.0 else ""
+
+    return (f"{desc}<br><br>{prefix}<b>{header}</b><br>{'<br>'.join(rows)}"
+            f"<br><br>{_personality_note(True)}")
 
   def _comfort_brake_description(self) -> str:
     percent = self.comfort_brake.action_item.get_value()
+    authority = _STOCK_COMFORT_BRAKE * percent / 100.0
+    scale = self.follow_distance.action_item.get_value() / 100.0
+    stop_distance = self.stop_distance.action_item.get_value()
+    v_ref, speed_label = _ref_speed()
+    t_follow = next((t for value, _, t in _PERSONALITIES if value == _active_personality()), 1.45)
+
+    # onset = v^2 / (2 * comfort_brake) + t_follow * v + stop_distance
+    onset = v_ref ** 2 / (2 * authority) + t_follow * scale * v_ref + stop_distance
 
     desc = tr("How much braking authority the planner assumes it has when closing on a slower or stopped " +
               "lead. Higher values approach faster and brake later and harder; lower values start braking " +
               "earlier and more gently. This does not change your following distance at steady speed — " +
-              "that is the personality button.")
+              "that is Follow Distance and the personality button.")
     warn = tr("Above 100% openpilot leaves itself less room to stop. Raise it one step at a time.")
+    onset_label = tr("At {}, starts braking for a stopped car from {}").format(speed_label, _distance(onset))
 
     prefix = f"<b>{warn}</b><br><br>" if percent > 100 else ""
-    authority = _STOCK_COMFORT_BRAKE * percent / 100.0
 
-    return f"{desc}<br><br>{prefix}<b>{tr('Braking authority')}</b> — {authority:.2f} m/s²"
+    return (f"{desc}<br><br>{prefix}<b>{tr('Braking authority')}</b> — {authority:.2f} m/s²"
+            f"<br>{onset_label}<br><br>{_personality_note(True)}")
 
   def _stop_distance_description(self) -> str:
     meters = self.stop_distance.action_item.get_value()
 
-    desc = tr("How far behind a stopped car openpilot comes to rest. Stock is 6 m.")
+    desc = tr("How far behind a stopped car openpilot comes to rest. Stock is 6 m. It is also added to the " +
+              "follow distance at every speed, so it shifts the gap by a fixed amount.")
 
-    return f"{desc}<br><br><b>{tr('Gap')}</b> — {meters} m ({meters * _M_TO_FT:.0f} ft)"
+    return (f"{desc}<br><br><b>{tr('Gap')}</b> — {meters} m ({meters * _M_TO_FT:.0f} ft)"
+            f"<br><br>{_personality_note(False)}")
