@@ -196,6 +196,14 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     // ndm: Rivian-only — max steering-wheel angle (deg) before MADS releases lateral control. Stock cutoff is 90.
     {"RivianMaxSteeringAngle", {PERSISTENT | BACKUP, INT, "90"}},
 
+    // ndm: Rivian-only — longitudinal comfort tuning. All are percent of stock except
+    // RivianStopDistance (meters). Hard ceilings (ACCEL_MAX 2.0 / ACCEL_MIN -3.5, matching
+    // RIVIAN_LONG_LIMITS in the panda) are unchanged; these only scale the comfort limits.
+    {"RivianAccelProfile", {PERSISTENT | BACKUP, INT, "100"}},   // A_CRUISE_MAX / J_CRUISE / _A_TOTAL_MAX
+    {"RivianDecelProfile", {PERSISTENT | BACKUP, INT, "100"}},   // A_CRUISE_MIN, cruise decel floor
+    {"RivianComfortBrake", {PERSISTENT | BACKUP, INT, "100"}},   // COMFORT_BRAKE, lead braking authority
+    {"RivianStopDistance", {PERSISTENT | BACKUP, INT, "6"}},     // STOP_DISTANCE, gap behind a stopped lead
+
     // Model Manager params
     {"ModelManager_ActiveBundle", {PERSISTENT, JSON}},
     {"ModelManager_ActiveBundleUSBGPU", {PERSISTENT, JSON}},
