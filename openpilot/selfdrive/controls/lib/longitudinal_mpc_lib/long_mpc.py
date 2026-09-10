@@ -224,6 +224,7 @@ class LongitudinalMpc:
     self.comfort_brake = COMFORT_BRAKE
     self.stop_distance = STOP_DISTANCE
     self.follow_scale = 1.0
+    self.lead_danger_factor = LEAD_DANGER_FACTOR
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
     self.source = LongitudinalPlanSource.cruise
@@ -344,7 +345,7 @@ class LongitudinalMpc:
     self.params[:,2] = np.min(x_obstacles, axis=1)
     self.params[:,3] = np.copy(self.a_prev)
     self.params[:,4] = t_follow
-    self.params[:,5] = LEAD_DANGER_FACTOR
+    self.params[:,5] = self.lead_danger_factor  # ndm
     self.params[:,6] = self.comfort_brake  # ndm
     self.params[:,7] = self.stop_distance  # ndm
 
