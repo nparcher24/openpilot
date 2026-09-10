@@ -31,11 +31,13 @@ from openpilot.common.realtime import DT_MDL
 #   follow_scale   trims T_FOLLOW, the selected personality's headway. The steady-state
 #                  gap is t_follow * v + stop_distance -- the only two terms there are --
 #                  so this is the only knob that scales following distance with speed.
-#                  Floored at 30% rather than 0: t_follow is the entire speed-dependent
-#                  part of the gap, so at 0 the target collapses to stop_distance at
-#                  every speed (6 m at 70 mph), which is not a headway the MPC should
-#                  be asked to hold. The user set this floor knowingly; the UI warns
-#                  below 100% and warns harder below a 1.0 s time gap.
+#                  Floored at 10% rather than 0 at the owner's request, for testing on
+#                  their own vehicle. t_follow is the entire speed-dependent part of the
+#                  gap, so at 0 the target collapses to stop_distance at every speed
+#                  (6 m at 70 mph) and there is no headway left to solve for; 10% keeps
+#                  a speed-dependent term. 10% is 0.32 s at 70 mph on aggressive -- far
+#                  inside any reaction margin. Default stays 100% and the UI warns in
+#                  three tiers below it.
 #
 # comfort_brake and stop_distance are acados runtime parameters (p[6], p[7]) rather
 # than compiled-in constants -- see the ndm edits in long_mpc.py.
@@ -44,7 +46,7 @@ DEFAULTS = {
   "RivianDecelProfile": (100, 100, 200),   # percent of stock
   "RivianComfortBrake": (100, 80, 150),    # percent of stock
   "RivianStopDistance": (6, 3, 10),        # meters
-  "RivianFollowDistance": (100, 30, 100),  # percent of the selected personality's T_FOLLOW
+  "RivianFollowDistance": (100, 10, 100),  # percent of the selected personality's T_FOLLOW
 }
 
 STOCK_COMFORT_BRAKE = 2.5

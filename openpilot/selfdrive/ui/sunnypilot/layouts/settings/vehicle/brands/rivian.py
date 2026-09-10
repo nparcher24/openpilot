@@ -101,7 +101,7 @@ class RivianSettings(BrandSettings):
     self.follow_distance = option_item_sp(
       title=lambda: tr("Follow Distance"),
       param="RivianFollowDistance",
-      min_value=30,
+      min_value=10,
       max_value=100,
       value_change_step=5,
       description="",
@@ -201,7 +201,11 @@ class RivianSettings(BrandSettings):
               "only one of them that scales with speed.")
     header = tr("Gap at {}").format(speed_label)
 
-    if time_gap < 1.0:
+    if time_gap < 0.5:
+      warn = tr("Under a 0.5 second time gap — roughly a car length at highway speed. openpilot cannot " +
+                "stop from here if the lead brakes hard, and nor can you. This is a test setting, not a " +
+                "drive setting. Do not leave it here.")
+    elif time_gap < 1.0:
       warn = tr("Under a 1.0 second time gap. At this setting openpilot has less room than a person " +
                 "needs to react, and its braking authority does not grow to match — the lead braking " +
                 "hard is the case that bites. Know what you are choosing here.")
