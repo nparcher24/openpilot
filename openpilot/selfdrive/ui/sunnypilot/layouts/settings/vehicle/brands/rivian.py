@@ -14,6 +14,7 @@ from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp
 _STOCK_ACCEL = (("0", 1.6), ("22", 1.2), ("56", 0.8), ("89", 0.6))
 _STOCK_DECEL = 1.2          # A_CRUISE_MIN
 _STOCK_COMFORT_BRAKE = 2.5  # COMFORT_BRAKE in long_mpc.py
+_STOCK_LEAD_DANGER = 0.75   # LEAD_DANGER_FACTOR in long_mpc.py
 _ACCEL_MAX = 2.0    # opendbc ACCEL_MAX; also the panda limit in safety/modes/rivian.h
 _ACCEL_MIN = 3.5    # opendbc ACCEL_MIN, as a magnitude
 _M_TO_FT = 3.281
@@ -108,6 +109,16 @@ class RivianSettings(BrandSettings):
       label_callback=lambda v: f"{v}%",
     )
 
+    self.lead_danger = option_item_sp(
+      title=lambda: tr("Lead Danger Zone"),
+      param="RivianLeadDanger",
+      min_value=10,
+      max_value=100,
+      value_change_step=5,
+      description="",
+      label_callback=lambda v: f"{v / 100:.2f}×",
+    )
+
     self.comfort_brake = option_item_sp(
       title=lambda: tr("Lead Braking Assertiveness"),
       param="RivianComfortBrake",
@@ -133,6 +144,7 @@ class RivianSettings(BrandSettings):
       self.accel_profile,
       self.decel_profile,
       self.follow_distance,
+      self.lead_danger,
       self.comfort_brake,
       self.stop_distance,
     ]
@@ -152,6 +164,7 @@ class RivianSettings(BrandSettings):
     self.accel_profile.set_description(self._accel_description())
     self.decel_profile.set_description(self._decel_description())
     self.follow_distance.set_description(self._follow_distance_description())
+    self.lead_danger.set_description(self._lead_danger_description())
     self.comfort_brake.set_description(self._comfort_brake_description())
     self.stop_distance.set_description(self._stop_distance_description())
 
@@ -219,6 +232,39 @@ class RivianSettings(BrandSettings):
 
     return (f"{desc}<br><br>{prefix}<b>{header}</b><br>{'<br>'.join(rows)}"
             f"<br><br>{_personality_note(True)}")
+
+  def _lead_danger_description(self) -> str:
+    ldf = self.lead_danger.action_item.get_value() / 100.0
+    authority = _STOCK_COMFORT_BRAKE * self.comfort_brake.action_item.get_value() / 100.0
+    scale = self.follow_distance.action_item.get_value() / 100.0
+    stop_distance = self.stop_distance.action_item.get_value()
+    v_ref, speed_label = _ref_speed()
+    t_follow = next((t for value, _, t in _PERSONALITIES if value == _active_personality()), 1.45)
+
+    # The constraint is gap >= ldf * desired_dist, and for a lead at the same speed the
+    # lead's own stopping-equivalence term (v^2 / 2cb) cancels one of ours, leaving
+    #   gap >= (ldf - 1) * v^2 / (2cb) + ldf * (t_follow * v + stop_distance)
+    # which is slack at the stock 0.75 -- worth saying, it is what the knob does.
+    braking_term = v_ref ** 2 / (2 * authority)
+    target = t_follow * scale * v_ref + stop_distance
+    floor = (ldf - 1.0) * braking_term + ldf * target
+
+    desc = tr("How close openpilot may get to the car ahead before a heavy penalty pushes back. It is a " +
+              "fraction of the target gap, so it does not move the steady-state following distance — it " +
+              "shapes cut-ins and closing on a slower car. Lower is more permissive and lets the car sit " +
+              "closer without fighting; higher makes it back off sooner.")
+    warn = tr("Low values remove openpilot's cushion for a car cutting in. It will still brake, but it " +
+              "will commit later.")
+
+    if floor > 0:
+      detail = tr("At {} behind a car at your speed, pushes back inside {}").format(speed_label, _distance(floor))
+    else:
+      detail = tr("At {} behind a car at your speed, never active — it only bites when closing").format(speed_label)
+
+    prefix = f"<b>{warn}</b><br><br>" if ldf < _STOCK_LEAD_DANGER else ""
+
+    return (f"{desc}<br><br>{prefix}<b>{tr('Danger zone')}</b> — {ldf:.2f}× {tr('of the target gap')}"
+            f"<br>{detail}<br><br>{_personality_note(True)}")
 
   def _comfort_brake_description(self) -> str:
     percent = self.comfort_brake.action_item.get_value()
