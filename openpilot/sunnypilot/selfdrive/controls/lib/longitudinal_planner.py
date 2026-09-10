@@ -82,6 +82,7 @@ class LongitudinalPlannerSP:
     self.rivian_long.update()
     self.rivian_mpc.comfort_brake = self.rivian_long.comfort_brake
     self.rivian_mpc.stop_distance = self.rivian_long.stop_distance
+    self.rivian_mpc.follow_scale = self.rivian_long.follow_scale
     self.dec.update(sm)
     self.e2e_alerts_helper.update(sm, self.events_sp)
 

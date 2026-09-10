@@ -28,6 +28,11 @@ from openpilot.common.realtime import DT_MDL
 #                  distance -- that is t_follow (the personality button).
 #   stop_distance  STOP_DISTANCE in the long MPC (6.0 m stock), the gap it leaves
 #                  behind a stopped lead.
+#   follow_scale   trims T_FOLLOW, the selected personality's headway. The steady-state
+#                  gap is t_follow * v + stop_distance, so this is the only knob that
+#                  scales following distance with speed. Floored at 70% deliberately:
+#                  it shrinks the real buffer to the lead and the model's braking
+#                  authority does not grow to match.
 #
 # comfort_brake and stop_distance are acados runtime parameters (p[6], p[7]) rather
 # than compiled-in constants -- see the ndm edits in long_mpc.py.
@@ -36,6 +41,7 @@ DEFAULTS = {
   "RivianDecelProfile": (100, 100, 200),   # percent of stock
   "RivianComfortBrake": (100, 80, 150),    # percent of stock
   "RivianStopDistance": (6, 3, 10),        # meters
+  "RivianFollowDistance": (100, 70, 100),  # percent of the selected personality's T_FOLLOW
 }
 
 STOCK_COMFORT_BRAKE = 2.5
@@ -54,6 +60,7 @@ class RivianLongTuning:
     self.decel_scale = 1.0
     self.comfort_brake = STOCK_COMFORT_BRAKE
     self.stop_distance = STOCK_STOP_DISTANCE
+    self.follow_scale = 1.0
     self._read_params()
 
   def _get(self, key: str) -> int:
@@ -77,6 +84,7 @@ class RivianLongTuning:
     self.decel_scale = self._get("RivianDecelProfile") / 100.0
     self.comfort_brake = STOCK_COMFORT_BRAKE * self._get("RivianComfortBrake") / 100.0
     self.stop_distance = float(self._get("RivianStopDistance"))
+    self.follow_scale = self._get("RivianFollowDistance") / 100.0
 
   def update(self) -> None:
     if self._frame % int(1. / DT_MDL) == 0:
