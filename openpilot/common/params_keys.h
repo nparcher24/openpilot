@@ -203,6 +203,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"RivianDecelProfile", {PERSISTENT | BACKUP, INT, "100"}},   // A_CRUISE_MIN, cruise decel floor
     {"RivianComfortBrake", {PERSISTENT | BACKUP, INT, "100"}},   // COMFORT_BRAKE, lead braking authority
     {"RivianStopDistance", {PERSISTENT | BACKUP, INT, "6"}},     // STOP_DISTANCE, gap behind a stopped lead
+    {"RivianFollowDistance", {PERSISTENT | BACKUP, INT, "100"}}, // T_FOLLOW scale, percent of the selected personality
 
     // Model Manager params
     {"ModelManager_ActiveBundle", {PERSISTENT, JSON}},
