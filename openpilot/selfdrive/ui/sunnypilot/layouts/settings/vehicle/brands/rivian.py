@@ -178,7 +178,7 @@ class RivianSettings(BrandSettings):
               "panda enforces.")
     note = tr("Only applies in normal (chill) mode — Experimental Mode already allows the full 2.0 m/s².")
 
-    return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — {table} m/s²"
+    return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — {table} m/s²" +
             f"<br><br>{note}<br>{_personality_note(False)}")
 
   def _decel_description(self) -> str:
@@ -187,7 +187,7 @@ class RivianSettings(BrandSettings):
     desc = tr("Scales how hard openpilot slows down to reach a lower set speed or speed limit. Stock is " +
               "-1.2 m/s². This does not change braking for a lead car — that is Lead Braking Assertiveness.")
 
-    return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — -{limit:.1f} m/s²"
+    return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — -{limit:.1f} m/s²" +
             f"<br><br>{_personality_note(False)}")
 
   def _follow_distance_description(self) -> str:
@@ -230,7 +230,7 @@ class RivianSettings(BrandSettings):
 
     prefix = f"<b>{warn}</b><br><br>" if warn else ""
 
-    return (f"{desc}<br><br>{prefix}<b>{header}</b><br>{'<br>'.join(rows)}"
+    return (f"{desc}<br><br>{prefix}<b>{header}</b><br>{'<br>'.join(rows)}" +
             f"<br><br>{_personality_note(True)}")
 
   def _lead_danger_description(self) -> str:
@@ -263,7 +263,7 @@ class RivianSettings(BrandSettings):
 
     prefix = f"<b>{warn}</b><br><br>" if ldf < _STOCK_LEAD_DANGER else ""
 
-    return (f"{desc}<br><br>{prefix}<b>{tr('Danger zone')}</b> — {ldf:.2f}× {tr('of the target gap')}"
+    return (f"{desc}<br><br>{prefix}<b>{tr('Danger zone')}</b> — {ldf:.2f}× {tr('of the target gap')}" +
             f"<br>{detail}<br><br>{_personality_note(True)}")
 
   def _comfort_brake_description(self) -> str:
@@ -286,7 +286,7 @@ class RivianSettings(BrandSettings):
 
     prefix = f"<b>{warn}</b><br><br>" if percent > 100 else ""
 
-    return (f"{desc}<br><br>{prefix}<b>{tr('Braking authority')}</b> — {authority:.2f} m/s²"
+    return (f"{desc}<br><br>{prefix}<b>{tr('Braking authority')}</b> — {authority:.2f} m/s²" +
             f"<br>{onset_label}<br><br>{_personality_note(True)}")
 
   def _stop_distance_description(self) -> str:
@@ -295,5 +295,5 @@ class RivianSettings(BrandSettings):
     desc = tr("How far behind a stopped car openpilot comes to rest. Stock is 6 m. It is also added to the " +
               "follow distance at every speed, so it shifts the gap by a fixed amount.")
 
-    return (f"{desc}<br><br><b>{tr('Gap')}</b> — {meters} m ({meters * _M_TO_FT:.0f} ft)"
+    return (f"{desc}<br><br><b>{tr('Gap')}</b> — {meters} m ({meters * _M_TO_FT:.0f} ft)" +
             f"<br><br>{_personality_note(False)}")
