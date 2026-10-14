@@ -1,6 +1,6 @@
 import pytest
 
-from tools.ndm.report import Flag, SyncReport, parse_report, ReportError  # noqa: TID251
+from tools.ndm.report import Flag, SyncReport, parse_report, ReportError
 
 
 def test_parse_minimal_clean_report():

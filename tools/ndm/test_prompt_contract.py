@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from tools.ndm.report import parse_report  # noqa: TID251
+from tools.ndm.report import parse_report
 
 PROMPT = Path(__file__).parent / "sync-prompt.md"
 

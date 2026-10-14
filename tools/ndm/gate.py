@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tools.ndm.report import SyncReport  # noqa: TID251
+from tools.ndm.report import SyncReport
 
 PUBLISHABLE_STATUS = {"clean", "resolved"}
 

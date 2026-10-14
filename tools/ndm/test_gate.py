@@ -1,5 +1,5 @@
-from tools.ndm.gate import decide  # noqa: TID251
-from tools.ndm.report import Flag, SyncReport  # noqa: TID251
+from tools.ndm.gate import decide
+from tools.ndm.report import Flag, SyncReport
 
 
 def _ok_report():
