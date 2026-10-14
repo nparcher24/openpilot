@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from tools.ndm import gitops  # noqa: TID251
+from tools.ndm import gitops
 
 
 def _git(cwd, *args):

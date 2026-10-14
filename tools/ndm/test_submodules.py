@@ -1,6 +1,6 @@
 import subprocess
 
-from tools.ndm.submodules import FORK_SUBMODULES, read_submodule_shas, detect_bumps  # noqa: TID251
+from tools.ndm.submodules import FORK_SUBMODULES, read_submodule_shas, detect_bumps
 
 
 def test_no_bump_when_shas_match():

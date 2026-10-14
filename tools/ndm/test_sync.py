@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-from tools.ndm import sync  # noqa: TID251
+from tools.ndm import sync
 
 
 def _git(cwd, *args):
