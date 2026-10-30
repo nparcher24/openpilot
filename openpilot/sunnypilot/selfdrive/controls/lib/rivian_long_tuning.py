@@ -12,14 +12,14 @@ from openpilot.common.realtime import DT_MDL
 #
 # Stock openpilot's comfort limits are far below what the R1 and the panda allow,
 # which makes cruise acceleration unusable on the highway (0.8 m/s^2 at 56 mph).
-# These four knobs scale the limits toward the hard ceilings, which are unchanged:
+# These knobs scale the planner limits; the hard ceilings are unchanged:
 # ACCEL_MAX 2.0 / ACCEL_MIN -3.5 m/s^2, matching RIVIAN_LONG_LIMITS in the panda
 # (opendbc/safety/modes/rivian.h).
 #
-#   accel_scale    A_CRUISE_MAX_VALS, J_CRUISE_VALS and _A_TOTAL_MAX_V in
-#                  longitudinal_planner.get_cruise_accel -- the accel ceiling,
-#                  how fast it ramps into it, and the combined lat+long budget.
-#   decel_scale    A_CRUISE_MIN, the cruise-source decel floor (-1.2 stock). Only
+#   accel_scale    Cruise accel ramp rate (jerk), up and down. Does not change
+#                  the accel ceiling: upstream caps cruise accel at ACCEL_MAX.
+#   decel_scale    Cruise decel floor, max(-0.5 * decel_scale, ACCEL_MIN) in
+#                  longitudinal_planner (-0.5 stock, -1.0 at the 2.0 clamp). Only
 #                  applies to closing on the set speed, not to lead braking.
 #   comfort_brake  COMFORT_BRAKE in the long MPC (2.5 stock). Sets how much braking
 #                  authority the planner assumes when closing on a slower lead:

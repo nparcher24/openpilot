@@ -9,13 +9,9 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp
 
-# ndm: stock A_CRUISE_MAX_VALS at A_CRUISE_MAX_BP = [0, 10, 25, 40] m/s, used to render
-# the resulting accel ceiling in the description so the percentage means something.
-_STOCK_ACCEL = (("0", 1.6), ("22", 1.2), ("56", 0.8), ("89", 0.6))
-_STOCK_DECEL = 1.2          # A_CRUISE_MIN
+_STOCK_DECEL = 0.5          # cruise decel floor at 100% (max(-0.5*decel_scale, ACCEL_MIN))
 _STOCK_COMFORT_BRAKE = 2.5  # COMFORT_BRAKE in long_mpc.py
 _STOCK_LEAD_DANGER = 0.75   # LEAD_DANGER_FACTOR in long_mpc.py
-_ACCEL_MAX = 2.0    # opendbc ACCEL_MAX; also the panda limit in safety/modes/rivian.h
 _ACCEL_MIN = 3.5    # opendbc ACCEL_MIN, as a magnitude
 _M_TO_FT = 3.281
 
@@ -80,7 +76,7 @@ class RivianSettings(BrandSettings):
     # RivianFollowDistance / RivianComfortBrake / RivianStopDistance; read once a second
     # by plannerd (no restart needed).
     self.accel_profile = option_item_sp(
-      title=lambda: tr("Acceleration Aggressiveness"),
+      title=lambda: tr("Acceleration Ramp Rate"),
       param="RivianAccelProfile",
       min_value=100,
       max_value=200,
@@ -169,23 +165,17 @@ class RivianSettings(BrandSettings):
     self.stop_distance.set_description(self._stop_distance_description())
 
   def _accel_description(self) -> str:
-    scale = self.accel_profile.action_item.get_value() / 100.0
-    table = ", ".join(f"{mph} mph: {min(a * scale, _ACCEL_MAX):.1f}" for mph, a in _STOCK_ACCEL)
+    desc = tr("Cruise acceleration ramp rate. Controls how quickly cruise acceleration builds up, " +
+              "up and down (jerk). Max accel is unchanged. 100% is stock; higher values ramp faster.")
 
-    desc = tr("Scales how hard openpilot accelerates on cruise. 100% is stock openpilot, which is very " +
-              "conservative on the R1 — only 0.8 m/s² at 56 mph. Higher values scale the acceleration, " +
-              "jerk and combined lateral+longitudinal limits together, up to the 2.0 m/s² ceiling the " +
-              "panda enforces.")
-    note = tr("Only applies in normal (chill) mode — Experimental Mode already allows the full 2.0 m/s².")
-
-    return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — {table} m/s²" +
-            f"<br><br>{note}<br>{_personality_note(False)}")
+    return f"{desc}<br><br>{_personality_note(False)}"
 
   def _decel_description(self) -> str:
     limit = min(_STOCK_DECEL * self.decel_profile.action_item.get_value() / 100.0, _ACCEL_MIN)
 
     desc = tr("Scales how hard openpilot slows down to reach a lower set speed or speed limit. Stock is " +
-              "-1.2 m/s². This does not change braking for a lead car — that is Lead Braking Assertiveness.")
+              "-0.5 m/s²; 200% is -1.0 m/s². This does not change braking for a lead car — that is Lead " +
+              "Braking Assertiveness.")
 
     return (f"{desc}<br><br><b>{tr('Resulting limit')}</b> — -{limit:.1f} m/s²" +
             f"<br><br>{_personality_note(False)}")
